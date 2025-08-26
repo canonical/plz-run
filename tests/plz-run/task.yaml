@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Zygmunt Krynicki
+summary: plz-run can run programs
+artifacts:
+    - env.log
+    - env-custom.log
+    - id.log
+    - cgroup.log
+    - session-id.log
+    - pwd.log
+environment:
+    AS_USER/root: root
+    AS_GROUP/root: root
+    AS_USER/ubuntu: ubuntu
+    AS_GROUP/ubuntu: ubuntu
+execute: |
+    plz-run -u "$AS_USER" -g "$AS_GROUP" env >env.log
+    plz-run -u "$AS_USER" -g "$AS_GROUP" -E KEY1=VALUE1 -E KEY2=VALUE2 env >env-custom.log
+    MATCH KEY1=VALUE1 <env-custom.log
+    MATCH KEY2=VALUE2 <env-custom.log
+    plz-run -u "$AS_USER" -g "$AS_GROUP" id -a >id.log
+    if [ "$AS_USER" = root ]; then
+        MATCH 'uid=0\(root\) gid=0\(root\)' <id.log
+    else
+        # On Ubuntu Core, LXD uses group 1000, so the user account gets GID 1001.
+        MATCH 'uid=1000\(ubuntu\) gid=100[10]\(ubuntu\)' <id.log
+    fi
+    plz-run -u "$AS_USER" -g "$AS_GROUP" cat /proc/self/cgroup >cgroup.log
+    plz-run -u "$AS_USER" -g "$AS_GROUP" cat /proc/self/sessionid >session-id.log
+    plz-run -u "$AS_USER" -g "$AS_GROUP" pwd >pwd.log
