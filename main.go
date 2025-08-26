@@ -9,8 +9,9 @@
 // restrictive apparmor profile, with an attached seccomp BPF program, with a
 // set of eBPF programs attached to the cgroup hierarchy.
 //
-// The newly started process has connected standard input, output and error streams
-// from the streams used to invoke plz-run. The exit code of the remote process is relayed.
+// The newly started process has connected standard input, output and error
+// streams from the streams used to invoke plz-run. The exit code of the remote
+// process is relayed.
 //
 // Supported features:
 //
