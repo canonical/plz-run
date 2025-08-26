@@ -152,12 +152,7 @@ func plz(ctx context.Context, args []string) error {
 				Path          string
 				Args          []string
 				IgnoreFailure bool
-			}{
-				{
-					Path: progPath,
-					Args: progArgs,
-				},
-			}),
+			}{{Path: progPath, Args: progArgs}}),
 		},
 	}
 	// The slice of auxiliary units is required by the API but unused.
