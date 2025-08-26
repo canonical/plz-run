@@ -127,8 +127,7 @@ func plz(ctx context.Context, args []string) error {
 
 	// Arrange go-dbus to deliver signals to the given channel.
 	sigCh := make(chan *dbus.Signal)
-	defer close(sigCh)
-	conn.Signal(sigCh)
+	conn.Signal(sigCh) // sigCh is closed when conn is closed.
 	defer conn.RemoveSignal(sigCh)
 
 	// Start the transient unit that corresponds to our workload and get the resulting object path.
