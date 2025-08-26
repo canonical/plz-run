@@ -30,7 +30,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -182,13 +181,11 @@ loop:
 	for {
 		select {
 		case sig := <-sigCh:
-			// log.Printf("signal sender %s, path %s, name: %s", sig.Sender, sig.Path, sig.Name)
 			switch sig.Name {
 			// When we receive properties changed signal, look for
 			// ExecMainStatus field of the .Service interface in order to store
 			// the exit code.
 			case dbusPropsPropertiesChangedSignal:
-				// log.Printf("props changed signal from %s", sig.Path)
 				var (
 					propsIface       string
 					propsChanged     map[string]dbus.Variant
@@ -197,21 +194,11 @@ loop:
 				if err := dbus.Store(sig.Body, &propsIface, &propsChanged, &propsInvalidated); err != nil {
 					return err
 				}
-				if false {
-					log.Printf("object %s:", sig.Path)
-					for propName, propValue := range propsChanged {
-						log.Printf("  prop %s.%s = %v", propsIface, propName, propValue)
-					}
-					for _, propName := range propsInvalidated {
-						log.Printf("  prop %s.%s invalidated", propsIface, propName)
-					}
-				}
 
 				if val, ok := propsChanged["ExecMainStatus"]; ok {
 					if err := val.Store(&exitStatus); err != nil {
 						return fmt.Errorf("cannot store ExecMainStatus: %w", err)
 					}
-					// log.Printf("exit status is %d", exitStatus)
 				}
 			case fdoSystemd1ManagerJobRemovedSignal:
 				// When we rececive the JobRemoved signal corresponding to our job, we're done.
@@ -224,15 +211,10 @@ loop:
 				if err := dbus.Store(sig.Body, &jobId, &jobPath, &jobUnit, &jobResult); err != nil {
 					return err
 				}
-				// log.Printf("job %d (%s) removed", jobId, jobPath)
-
 				// The job that we have started has been removed. We can return.
 				if jobPath == ourJobPath {
-					// log.Printf("job unit %s", jobUnit)
 					break loop
 				}
-			default:
-				// log.Printf("received signal: %#v\n", sig)
 			}
 		case <-ctx.Done():
 			return ctx.Err()
