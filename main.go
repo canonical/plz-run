@@ -35,6 +35,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -262,6 +263,11 @@ func plz(ctx context.Context, args []string) error {
 					if val, ok := propsChanged[prop.name]; ok {
 						if err := val.Store(prop.storage); err != nil {
 							return fmt.Errorf("cannot store %s: %w", prop.name, err)
+						}
+					}
+					for _, p := range propsInvalidated {
+						if prop.name == p {
+							reflect.ValueOf(prop.storage).Elem().SetZero()
 						}
 					}
 				}
