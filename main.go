@@ -72,8 +72,8 @@ func plz(ctx context.Context, args []string) error {
 	fl := flag.NewFlagSet("plz", flag.ContinueOnError)
 	var user, group string
 	var env EnvList
-	fl.StringVar(&user, "u", "root", "Ask systemd to use given user")
-	fl.StringVar(&group, "g", "root", "Ask systemd to use given group")
+	fl.StringVar(&user, "u", "", "Ask systemd to use given user")
+	fl.StringVar(&group, "g", "", "Ask systemd to use given group")
 	fl.Var(&env, "E", "Ask systemd to inject extra environment variables (can be used multiple times)")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
@@ -142,8 +142,6 @@ func plz(ctx context.Context, args []string) error {
 	props := []Prop{
 		{Name: "Description", Value: dbus.MakeVariant("potato")},
 		{Name: "Type", Value: dbus.MakeVariant("oneshot")},
-		{Name: "User", Value: dbus.MakeVariant(user)},
-		{Name: "Group", Value: dbus.MakeVariant(group)},
 		{Name: "StandardInputFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stdin.Fd()))},
 		{Name: "StandardOutputFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stdout.Fd()))},
 		{Name: "StandardErrorFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stderr.Fd()))},
@@ -155,6 +153,12 @@ func plz(ctx context.Context, args []string) error {
 				IgnoreFailure bool
 			}{{Path: progPath, Args: progArgs}}),
 		},
+	}
+	if user != "" {
+		props = append(props, Prop{Name: "User", Value: dbus.MakeVariant(user)})
+	}
+	if group != "" {
+		props = append(props, Prop{Name: "Group", Value: dbus.MakeVariant(group)})
 	}
 	// The slice of auxiliary units is required by the API but unused.
 	var aux []struct {
