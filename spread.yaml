@@ -16,7 +16,7 @@ backends:
             fi
 
             export QEMU_SMP_OPTION="-smp 2"
-            export QEMU_MEM_OPTION="-m 1024"
+            export QEMU_MEM_OPTION="-m 768"
 
             exec image-garden allocate "$SPREAD_SYSTEM"."${ARCH:=$(uname -m)}"
         discard: |
