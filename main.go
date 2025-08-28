@@ -63,6 +63,7 @@ func plz(ctx context.Context, args []string) error {
 		fdoSystemd1BusName                                  = "org.freedesktop.systemd1"
 		fdoSystemd1ObjectPath               dbus.ObjectPath = "/org/freedesktop/systemd1"
 		fdoSystemd1ManagerIface                             = fdoSystemd1BusName + ".Manager"
+		fdoSystemd1ServiceIface                             = fdoSystemd1BusName + ".Service"
 		fdoSystemd1StartTransientUnitMethod                 = fdoSystemd1ManagerIface + ".StartTransientUnit"
 		fdoSystemd1ManagerJobRemovedMember                  = "JobRemoved"
 		fdoSystemd1ManagerJobRemovedSignal                  = fdoSystemd1ManagerIface + "." + fdoSystemd1ManagerJobRemovedMember
@@ -120,9 +121,9 @@ func plz(ctx context.Context, args []string) error {
 	matchPropsChangedExpr := []dbus.MatchOption{
 		dbus.WithMatchSender(fdoSystemd1BusName), // match the bus name of systemd,
 		dbus.WithMatchObjectPath(dbus.ObjectPath(fmt.Sprintf("%s/unit/plz_2drun_2d%d_2eservice", fdoSystemd1ObjectPath, cookie))),
-		dbus.WithMatchInterface(dbusPropsIface),                  // match the Properties interface name.
-		dbus.WithMatchMember(dbusPropsPropertiesChangedMember),   // match the PropertiesChanged interface member.
-		dbus.WithMatchArg(0, "org.freedesktop.systemd1.Service"), // match only messages whose first body item, the interface name, is that of .Service.
+		dbus.WithMatchInterface(dbusPropsIface),                // match the Properties interface name.
+		dbus.WithMatchMember(dbusPropsPropertiesChangedMember), // match the PropertiesChanged interface member.
+		dbus.WithMatchArg(0, fdoSystemd1ServiceIface),          // match only messages whose first body item, the interface name, is that of .Service.
 	}
 	conn.AddMatchSignalContext(ctx, matchPropsChangedExpr...)
 	defer conn.RemoveMatchSignalContext(ctx, matchPropsChangedExpr...)
