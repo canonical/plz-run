@@ -243,6 +243,19 @@ func plz(ctx context.Context, args []string) error {
 					return err
 				}
 
+				// Certain properties are interesting to us.
+				type nameStorage struct {
+					iface   string
+					name    string
+					storage any
+				}
+				var (
+					interestingProps []nameStorage = []nameStorage{
+						{fdoSystemd1ServiceIface, "ExecMainCode", &execMainCode},
+						{fdoSystemd1ServiceIface, "ExecMainStatus", &execMainStatus},
+						{fdoSystemd1ServiceIface, "Result", &result},
+					}
+				)
 				for p, v := range propsChanged {
 					slog.Debug("property-changed", slog.String("object", string(sig.Path)),
 						slog.String("interface", propsIface), slog.String("property", p), slog.Any("value", v.Value()))
@@ -252,14 +265,11 @@ func plz(ctx context.Context, args []string) error {
 						slog.String("interface", propsIface), slog.String("property", p))
 				}
 
-				for _, prop := range []struct {
-					name    string
-					storage any
-				}{
-					{"ExecMainCode", &execMainCode},
-					{"ExecMainStatus", &execMainStatus},
-					{"Result", &result},
-				} {
+				// Store the subset of properties we are interested in.
+				for _, prop := range interestingProps {
+					if prop.iface != propsIface {
+						continue
+					}
 					if val, ok := propsChanged[prop.name]; ok {
 						if err := val.Store(prop.storage); err != nil {
 							return fmt.Errorf("cannot store %s: %w", prop.name, err)
