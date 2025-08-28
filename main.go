@@ -256,12 +256,14 @@ func plz(ctx context.Context, args []string) error {
 						{fdoSystemd1ServiceIface, "Result", &result},
 					}
 				)
+
+				// Log what we're seeing.
 				for p, v := range propsChanged {
-					slog.Debug("property-changed", slog.String("object", string(sig.Path)),
+					slog.Debug("property changed", slog.String("object", string(sig.Path)),
 						slog.String("interface", propsIface), slog.String("property", p), slog.Any("value", v.Value()))
 				}
 				for _, p := range propsInvalidated {
-					slog.Debug("property-invalidated", slog.String("object", string(sig.Path)),
+					slog.Debug("property invalidated", slog.String("object", string(sig.Path)),
 						slog.String("interface", propsIface), slog.String("property", p))
 				}
 
@@ -274,6 +276,8 @@ func plz(ctx context.Context, args []string) error {
 						if err := val.Store(prop.storage); err != nil {
 							return fmt.Errorf("cannot store %s: %w", prop.name, err)
 						}
+						slog.Debug("stored interesting property",
+							slog.String("interface", propsIface), slog.String("property", prop.name), slog.Any("value", val.Value()))
 					}
 					for _, p := range propsInvalidated {
 						if prop.name == p {
@@ -295,9 +299,9 @@ func plz(ctx context.Context, args []string) error {
 				if err := dbus.Store(sig.Body, &jobId, &jobPath, &jobUnit, &jobResult); err != nil {
 					return err
 				}
+				slog.Debug("job removed", slog.String("object", string(jobPath)))
 				if jobPath == ourJobPath {
 					jobRemoved = true
-					slog.Debug("job-removed", slog.String("object", string(jobPath)))
 				}
 			}
 		case <-ctx.Done():
@@ -305,7 +309,7 @@ func plz(ctx context.Context, args []string) error {
 		}
 	}
 
-	slog.Debug("done-waiting",
+	slog.Info("done waiting for job result",
 		slog.String("Result", result),
 		slog.Int64("ExecMainCode", int64(execMainCode)),
 		slog.Int64("ExecMainStatus", int64(execMainStatus)))
@@ -329,6 +333,7 @@ func plz(ctx context.Context, args []string) error {
 }
 
 func main() {
+	logLevel.Set(slog.LevelWarn)
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel})))
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 	cmdr.RunMain(cmdr.Func(plz), os.Args)
