@@ -74,10 +74,12 @@ func plz(ctx context.Context, args []string) error {
 	var user, group string
 	var env EnvList
 	var pamName string
+	var workingDir string
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
 	fl.Var(&env, "E", "Ask systemd use the given Environment= (can be used multiple times)")
 	fl.StringVar(&pamName, "pam", "", "Ask systemd to use given name as PAMName=")
+	fl.StringVar(&workingDir, "C", "", "Ask systemd to use the given WorkingDirectory=")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -167,6 +169,9 @@ func plz(ctx context.Context, args []string) error {
 	}
 	if pamName != "" {
 		props = append(props, Prop{Name: "PAMName", Value: dbus.MakeVariant(pamName)})
+	}
+	if workingDir != "" {
+		props = append(props, Prop{Name: "WorkingDirectory", Value: dbus.MakeVariant(workingDir)})
 	}
 	// The slice of auxiliary units is required by the API but unused.
 	var aux []struct {
