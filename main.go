@@ -242,6 +242,15 @@ func plz(ctx context.Context, args []string) error {
 					return err
 				}
 
+				for p, v := range propsChanged {
+					slog.Debug("property-changed", slog.String("object", string(sig.Path)),
+						slog.String("interface", propsIface), slog.String("property", p), slog.Any("value", v.Value()))
+				}
+				for _, p := range propsInvalidated {
+					slog.Debug("property-invalidated", slog.String("object", string(sig.Path)),
+						slog.String("interface", propsIface), slog.String("property", p))
+				}
+
 				for _, prop := range []struct {
 					name    string
 					storage any
@@ -272,6 +281,7 @@ func plz(ctx context.Context, args []string) error {
 				}
 				if jobPath == ourJobPath {
 					jobRemoved = true
+					slog.Debug("job-removed", slog.String("object", string(jobPath)))
 				}
 			}
 		case <-ctx.Done():
@@ -279,6 +289,10 @@ func plz(ctx context.Context, args []string) error {
 		}
 	}
 
+	slog.Debug("done-waiting",
+		slog.String("Result", result),
+		slog.Int64("ExecMainCode", int64(execMainCode)),
+		slog.Int64("ExecMainStatus", int64(execMainStatus)))
 
 	// Relay ExecMainStatus exit code back to the caller.
 	switch result {
