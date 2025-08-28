@@ -322,6 +322,7 @@ func plz(ctx context.Context, args []string) error {
 		}
 		return nil
 	case "success":
+		// This includes services that returned non-zero but expected exit code.
 		return nil
 	case "failure":
 		return cmdr.SilentError(1)
