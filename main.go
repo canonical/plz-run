@@ -74,9 +74,9 @@ func plz(ctx context.Context, args []string) error {
 	var user, group string
 	var env EnvList
 	var pamName string
-	fl.StringVar(&user, "u", "", "Ask systemd to use given user")
-	fl.StringVar(&group, "g", "", "Ask systemd to use given group")
-	fl.Var(&env, "E", "Ask systemd to inject extra environment variables (can be used multiple times)")
+	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
+	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
+	fl.Var(&env, "E", "Ask systemd use the given Environment= (can be used multiple times)")
 	fl.StringVar(&pamName, "pam", "", "Ask systemd to use given name as PAMName=")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
