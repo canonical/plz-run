@@ -161,7 +161,6 @@ func plz(ctx context.Context, args []string) error {
 		Name       string
 		Properties []Prop
 	}
-
 	var ourJobPath dbus.ObjectPath
 	obj := conn.Object(fdoSystemd1BusName, fdoSystemd1ObjectPath)
 	if err := obj.CallWithContext(ctx, fdoSystemd1StartTransientUnitMethod, flags, name, mode, props, aux).Store(&ourJobPath); err != nil {
@@ -175,10 +174,10 @@ loop:
 		select {
 		case sig := <-sigCh:
 			switch sig.Name {
-			// When we receive properties changed signal, look for
-			// ExecMainStatus field of the .Service interface in order to store
-			// the exit code.
 			case dbusPropsPropertiesChangedSignal:
+				// When we receive properties changed signal, look for
+				// ExecMainStatus field of the .Service interface in order to
+				// store the exit code.
 				var (
 					propsIface       string
 					propsChanged     map[string]dbus.Variant
@@ -204,7 +203,6 @@ loop:
 				if err := dbus.Store(sig.Body, &jobId, &jobPath, &jobUnit, &jobResult); err != nil {
 					return err
 				}
-				// The job that we have started has been removed. We can return.
 				if jobPath == ourJobPath {
 					break loop
 				}
@@ -214,6 +212,7 @@ loop:
 		}
 	}
 
+	// Relay ExecMainStatus exit code back to the caller.
 	if exitStatus != 0 {
 		return cmdr.SilentError(uint8(exitStatus))
 	}
