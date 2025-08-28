@@ -145,7 +145,6 @@ func plz(ctx context.Context, args []string) error {
 		{Name: "StandardInputFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stdin.Fd()))},
 		{Name: "StandardOutputFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stdout.Fd()))},
 		{Name: "StandardErrorFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stderr.Fd()))},
-		{Name: "Environment", Value: dbus.MakeVariant(env)},
 		{
 			Name: "ExecStart", Value: dbus.MakeVariant([]struct {
 				Path          string
@@ -159,6 +158,9 @@ func plz(ctx context.Context, args []string) error {
 	}
 	if group != "" {
 		props = append(props, Prop{Name: "Group", Value: dbus.MakeVariant(group)})
+	}
+	if len(env) > 0 {
+		props = append(props, Prop{Name: "Environment", Value: dbus.MakeVariant(env)})
 	}
 	// The slice of auxiliary units is required by the API but unused.
 	var aux []struct {
