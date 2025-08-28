@@ -309,6 +309,8 @@ func plz(ctx context.Context, args []string) error {
 		return nil
 	case "success":
 		return nil
+	case "failure":
+		return cmdr.SilentError(1)
 	case "signal":
 		return fmt.Errorf("killed by signal %d", execMainStatus)
 	default:
