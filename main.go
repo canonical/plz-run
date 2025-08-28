@@ -134,10 +134,12 @@ func plz(ctx context.Context, args []string) error {
 	flags := dbus.Flags(0)
 	name := fmt.Sprintf("plz-run-%d.service", cookie)
 	mode := "fail"
-	props := []struct {
+
+	type Prop struct {
 		Name  string
 		Value dbus.Variant
-	}{
+	}
+	props := []Prop{
 		{Name: "Description", Value: dbus.MakeVariant("potato")},
 		{Name: "Type", Value: dbus.MakeVariant("oneshot")},
 		{Name: "User", Value: dbus.MakeVariant(user)},
@@ -157,10 +159,7 @@ func plz(ctx context.Context, args []string) error {
 	// The slice of auxiliary units is required by the API but unused.
 	var aux []struct {
 		Name       string
-		Properties []struct {
-			Name  string
-			Value dbus.Variant
-		}
+		Properties []Prop
 	}
 
 	var ourJobPath dbus.ObjectPath
