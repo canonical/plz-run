@@ -72,9 +72,11 @@ func plz(ctx context.Context, args []string) error {
 	fl := flag.NewFlagSet("plz", flag.ContinueOnError)
 	var user, group string
 	var env EnvList
+	var pamName string
 	fl.StringVar(&user, "u", "", "Ask systemd to use given user")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given group")
 	fl.Var(&env, "E", "Ask systemd to inject extra environment variables (can be used multiple times)")
+	fl.StringVar(&pamName, "pam", "", "Ask systemd to use given name as PAMName=")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -161,6 +163,9 @@ func plz(ctx context.Context, args []string) error {
 	}
 	if len(env) > 0 {
 		props = append(props, Prop{Name: "Environment", Value: dbus.MakeVariant(env)})
+	}
+	if pamName != "" {
+		props = append(props, Prop{Name: "PAMName", Value: dbus.MakeVariant(pamName)})
 	}
 	// The slice of auxiliary units is required by the API but unused.
 	var aux []struct {

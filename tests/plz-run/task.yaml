@@ -10,21 +10,58 @@ artifacts:
     - pwd.log
 environment:
     AS_USER/root: root
-    AS_GROUP/root: root
     AS_USER/ubuntu: ubuntu
-    AS_GROUP/ubuntu: ubuntu
+    AS_USER/ubuntu_pam: ubuntu
+    AS_PAM_NAME/ubuntu_pam: session-common
+prepare: |
+    : "${AS_PAM_NAME:=}"
+    plz-run -u "$AS_USER" -pam "$AS_PAM_NAME" env >env.log
+    plz-run -u "$AS_USER" -pam "$AS_PAM_NAME" -E KEY1=VALUE1 -E KEY2=VALUE2 env >env-custom.log
+    plz-run -u "$AS_USER" -pam "$AS_PAM_NAME" id -a >id.log
+    plz-run -u "$AS_USER" -pam "$AS_PAM_NAME" cat /proc/self/cgroup >cgroup.log
+    plz-run -u "$AS_USER" -pam "$AS_PAM_NAME" cat /proc/self/sessionid >session-id.log
+    plz-run -u "$AS_USER" -pam "$AS_PAM_NAME" pwd >pwd.log
+    if [ -n "$AS_PAM_NAME" ]; then
+      plz-run -u "$AS_USER" -pam "$AS_PAM_NAME" systemctl --user status  >systemctl-user-status.log
+    fi
 execute: |
-    plz-run -u "$AS_USER" -g "$AS_GROUP" env >env.log
-    plz-run -u "$AS_USER" -g "$AS_GROUP" -E KEY1=VALUE1 -E KEY2=VALUE2 env >env-custom.log
+    : "${AS_PAM_NAME:=}"
     MATCH KEY1=VALUE1 <env-custom.log
     MATCH KEY2=VALUE2 <env-custom.log
-    plz-run -u "$AS_USER" -g "$AS_GROUP" id -a >id.log
     if [ "$AS_USER" = root ]; then
         MATCH 'uid=0\(root\) gid=0\(root\)' <id.log
     else
         # On Ubuntu Core, LXD uses group 1000, so the user account gets GID 1001.
         MATCH 'uid=1000\(ubuntu\) gid=100[10]\(ubuntu\)' <id.log
     fi
-    plz-run -u "$AS_USER" -g "$AS_GROUP" cat /proc/self/cgroup >cgroup.log
-    plz-run -u "$AS_USER" -g "$AS_GROUP" cat /proc/self/sessionid >session-id.log
-    plz-run -u "$AS_USER" -g "$AS_GROUP" pwd >pwd.log
+    if [ -z "$AS_PAM_NAME" ]; then
+      case $SPREAD_SYSTEM in
+        ubuntu-cloud-16.04|ubuntu-core-16)
+          MATCH '1:name=systemd:/system\.slice/plz-run-[0-9]+\.service' <cgroup.log
+          ;;
+        ubuntu-cloud-18.04|ubuntu-cloud-20.04|ubuntu-core-18|ubuntu-core-20)
+          MATCH '1:name=systemd:/system\.slice/plz-run-[0-9]+\.service' <cgroup.log
+          MATCH '0::/system\.slice/plz-run-[0-9]+\.service' <cgroup.log
+          ;;
+        *)
+          MATCH '0::/system\.slice/plz-run-[0-9]+\.service' <cgroup.log
+          ;;
+      esac
+    else
+      case $SPREAD_SYSTEM in
+        ubuntu-cloud-16.04|ubuntu-core-16)
+          # Pure cgroup v1 system.
+          MATCH '1:name=systemd:/user\.slice/user-1000\.slice/session-c[0-9]+\.scope' <cgroup.log
+          ;;
+        ubuntu-cloud-18.04|ubuntu-cloud-20.04|ubuntu-core-18|ubuntu-core-20)
+          # Hybrid cgroup v1 and v2 system.
+          MATCH '1:name=systemd:/user\.slice/user-1000\.slice/session-c[0-9]+\.scope' <cgroup.log
+          MATCH '0::/user\.slice/user-1000\.slice/session-c[0-9]+\.scope' <cgroup.log
+          ;;
+        *)
+          # Pure cgroup v2 system.
+          MATCH '0::/user\.slice/user-1000\.slice/session-c[0-9]+\.scope' <cgroup.log
+          ;;
+      esac
+
+    fi
