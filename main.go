@@ -217,16 +217,22 @@ func plz(ctx context.Context, args []string) error {
 	}
 
 	// Iterate through the signals we've received from D-Bus.
-	var exitStatus uint32
-loop:
-	for {
+	var (
+		execMainCode   int32
+		execMainStatus int32
+		result         string
+		jobRemoved     bool
+	)
+
+	// Wait for the job to be removed and for a result to settle.
+	for result == "" || execMainCode == 0 || !jobRemoved {
 		select {
 		case sig := <-sigCh:
 			switch sig.Name {
 			case dbusPropsPropertiesChangedSignal:
 				// When we receive properties changed signal, look for
-				// ExecMainStatus field of the .Service interface in order to
-				// store the exit code.
+				// ExecMainCode, ExecMainStatus and Result properties of the
+				// .Service interface in order to store the exit code.
 				var (
 					propsIface       string
 					propsChanged     map[string]dbus.Variant
@@ -236,13 +242,25 @@ loop:
 					return err
 				}
 
-				if val, ok := propsChanged["ExecMainStatus"]; ok {
-					if err := val.Store(&exitStatus); err != nil {
-						return fmt.Errorf("cannot store ExecMainStatus: %w", err)
+				for _, prop := range []struct {
+					name    string
+					storage any
+				}{
+					{"ExecMainCode", &execMainCode},
+					{"ExecMainStatus", &execMainStatus},
+					{"Result", &result},
+				} {
+					if val, ok := propsChanged[prop.name]; ok {
+						if err := val.Store(prop.storage); err != nil {
+							return fmt.Errorf("cannot store %s: %w", prop.name, err)
+						}
 					}
 				}
 			case fdoSystemd1ManagerJobRemovedSignal:
-				// When we rececive the JobRemoved signal corresponding to our job, we're done.
+				// When we receive the JobRemoved signal corresponding to our
+				// job we may not yet be ready to return, as the property
+				// change with the exit code of the main process of the service
+				// arrives separately and after.
 				var (
 					jobId     uint32
 					jobPath   dbus.ObjectPath
@@ -253,7 +271,7 @@ loop:
 					return err
 				}
 				if jobPath == ourJobPath {
-					break loop
+					jobRemoved = true
 				}
 			}
 		case <-ctx.Done():
