@@ -134,7 +134,8 @@ func plz(ctx context.Context, args []string) error {
 	cookie := rand.Int()
 
 	// Connect to the D-Bus system bus.
-	conn, err := dbus.ConnectSystemBus(dbus.WithContext(ctx))
+	// Use a sequential signal handler so that we always see the signals in the order they are delivered.
+	conn, err := dbus.ConnectSystemBus(dbus.WithContext(ctx), dbus.WithSignalHandler(dbus.NewSequentialSignalHandler()))
 	if err != nil {
 		return err
 	}
