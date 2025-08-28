@@ -28,6 +28,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -76,12 +77,14 @@ func plz(ctx context.Context, args []string) error {
 		env         EnvList
 		pamName     string
 		workingDir  string
+		sameDir     bool
 	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
 	fl.Var(&env, "E", "Ask systemd use the given Environment= (can be used multiple times)")
 	fl.StringVar(&pamName, "pam", "", "Ask systemd to use given name as PAMName=")
 	fl.StringVar(&workingDir, "C", "", "Ask systemd to use the given WorkingDirectory=")
+	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -89,9 +92,22 @@ func plz(ctx context.Context, args []string) error {
 	if err := fl.Parse(args); err != nil {
 		return err
 	}
+	if sameDir && workingDir != "" {
+		return errors.New("cannot use both -same-dir and -C")
+	}
+
 	if fl.NArg() == 0 {
 		fl.Usage()
 		return flag.ErrHelp
+	}
+
+	// Preserve the current working directory if requested.
+	if sameDir {
+		if d, err := os.Getwd(); err != nil {
+			return err
+		} else {
+			workingDir = d
+		}
 	}
 
 	// Find the program the user wants to run.
