@@ -279,12 +279,21 @@ func plz(ctx context.Context, args []string) error {
 		}
 	}
 
-	// Relay ExecMainStatus exit code back to the caller.
-	if exitStatus != 0 {
-		return cmdr.SilentError(uint8(exitStatus))
-	}
 
-	return nil
+	// Relay ExecMainStatus exit code back to the caller.
+	switch result {
+	case "exit-code":
+		if execMainStatus > 0 {
+			return cmdr.SilentError(uint8(execMainStatus))
+		}
+		return nil
+	case "success":
+		return nil
+	case "signal":
+		return fmt.Errorf("killed by signal %d", execMainStatus)
+	default:
+		return nil
+	}
 }
 
 func main() {
