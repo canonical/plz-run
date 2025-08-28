@@ -31,6 +31,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -53,6 +54,17 @@ func (e *EnvList) Set(value string) error {
 	*e = append(*e, value)
 	return nil
 }
+
+// LogLevelBridge bridges flag.Var with slog.LevelVar
+//
+// This masks over the incompatible signature of Set between the interface and the type.
+type LogLevelBridge struct{ Var *slog.LevelVar }
+
+func (b LogLevelBridge) String() string     { return b.Var.String() }
+func (b LogLevelBridge) Set(s string) error { return b.Var.UnmarshalText([]byte(s)) }
+
+// Global log level variable.
+var logLevel slog.LevelVar
 
 func plz(ctx context.Context, args []string) error {
 	// Constants related to systemd D-Bus interfaces.
@@ -85,6 +97,7 @@ func plz(ctx context.Context, args []string) error {
 	fl.StringVar(&pamName, "pam", "", "Ask systemd to use given name as PAMName=")
 	fl.StringVar(&workingDir, "C", "", "Ask systemd to use the given WorkingDirectory=")
 	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
+	fl.Var(&LogLevelBridge{Var: &logLevel}, "log-level", "Set internal logging level")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -256,5 +269,7 @@ loop:
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel})))
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 	cmdr.RunMain(cmdr.Func(plz), os.Args)
 }
