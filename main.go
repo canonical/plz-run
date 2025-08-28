@@ -327,6 +327,8 @@ func plz(ctx context.Context, args []string) error {
 		return cmdr.SilentError(1)
 	case "signal":
 		return fmt.Errorf("killed by signal %d", execMainStatus)
+	case "core-dump":
+		return errors.New("program dumped core")
 	default:
 		return nil
 	}
