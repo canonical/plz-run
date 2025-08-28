@@ -71,10 +71,12 @@ func plz(ctx context.Context, args []string) error {
 
 	// Parse arguments.
 	fl := flag.NewFlagSet("plz", flag.ContinueOnError)
-	var user, group string
-	var env EnvList
-	var pamName string
-	var workingDir string
+	var (
+		user, group string
+		env         EnvList
+		pamName     string
+		workingDir  string
+	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
 	fl.Var(&env, "E", "Ask systemd use the given Environment= (can be used multiple times)")
