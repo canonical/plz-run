@@ -61,7 +61,13 @@ func (e *EnvList) Set(value string) error {
 // This masks over the incompatible signature of Set between the interface and the type.
 type LogLevelBridge struct{ Var *slog.LevelVar }
 
-func (b LogLevelBridge) String() string     { return b.Var.String() }
+func (b LogLevelBridge) String() string {
+	if b.Var == nil {
+		return "?"
+	}
+	return b.Var.String()
+}
+
 func (b LogLevelBridge) Set(s string) error { return b.Var.UnmarshalText([]byte(s)) }
 
 // Global log level variable.
