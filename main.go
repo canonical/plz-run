@@ -35,6 +35,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -131,9 +132,13 @@ func plz(ctx context.Context, args []string) error {
 	}
 
 	// Find the program the user wants to run.
-	progPath, err := exec.LookPath(fl.Arg(0))
-	if err != nil {
-		return err
+	progPath := fl.Arg(0)
+	if !filepath.IsAbs(progPath) {
+		var err error
+		progPath, err = exec.LookPath(progPath)
+		if err != nil {
+			return err
+		}
 	}
 	progArgs := fl.Args()
 
