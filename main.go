@@ -91,7 +91,7 @@ func plz(ctx context.Context, args []string) error {
 	)
 
 	// Parse arguments.
-	fl := flag.NewFlagSet("plz", flag.ContinueOnError)
+	fl := flag.NewFlagSet("plz-run", flag.ContinueOnError)
 	var (
 		user, group string
 		env         EnvList
