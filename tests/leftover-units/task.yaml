@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Zygmunt Krynicki
+summary: failed units do not accumulate
+prepare: |
+execute: |
+    plz-run false || true
+    systemctl --failed | NOMATCH 'plz-run-'

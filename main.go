@@ -191,6 +191,7 @@ func plz(ctx context.Context, args []string) error {
 	props := []Prop{
 		{Name: "Description", Value: dbus.MakeVariant("potato")},
 		{Name: "Type", Value: dbus.MakeVariant("oneshot")},
+		{Name: "CollectMode", Value: dbus.MakeVariant("inactive-or-failed")},
 		{Name: "StandardInputFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stdin.Fd()))},
 		{Name: "StandardOutputFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stdout.Fd()))},
 		{Name: "StandardErrorFileDescriptor", Value: dbus.MakeVariant(dbus.UnixFD(os.Stderr.Fd()))},
