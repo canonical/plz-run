@@ -343,7 +343,7 @@ func plz(ctx context.Context, args []string) error {
 	case "core-dump":
 		return errors.New("program dumped core")
 	default:
-		return nil
+		return fmt.Errorf("unhandled systemd job result value: %v", result)
 	}
 }
 
