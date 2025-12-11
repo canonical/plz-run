@@ -99,6 +99,7 @@ func plz(ctx context.Context, args []string) error {
 		pamName     string
 		workingDir  string
 		sameDir     bool
+		expandVar   bool
 	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
@@ -107,6 +108,7 @@ func plz(ctx context.Context, args []string) error {
 	fl.StringVar(&workingDir, "C", "", "Ask systemd to use the given WorkingDirectory=")
 	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
 	fl.Var(&LogLevelBridge{Var: &logLevel}, "log-level", "Set internal logging level")
+	fl.BoolVar(&expandVar, "expand-var", false, "Let systemd pre-expand ${...} patterns in ARGS")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -142,6 +144,12 @@ func plz(ctx context.Context, args []string) error {
 		}
 	}
 	progArgs := fl.Args()
+	// systemd expands ${...} patterns by default in Exec sections, expandVar disables this behaviour
+	if !expandVar {
+		for i, arg := range progArgs {
+			progArgs[i] = strings.ReplaceAll(arg, "${", "$${")
+		}
+	}
 
 	// Pick a random number as our unique element of the service we're about to start.
 	cookie := rand.Int()
