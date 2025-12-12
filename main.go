@@ -99,6 +99,7 @@ func plz(ctx context.Context, args []string) error {
 		pamName     string
 		workingDir  string
 		sameDir     bool
+		expandVar   bool
 	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
@@ -107,6 +108,7 @@ func plz(ctx context.Context, args []string) error {
 	fl.StringVar(&workingDir, "C", "", "Ask systemd to use the given WorkingDirectory=")
 	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
 	fl.Var(&LogLevelBridge{Var: &logLevel}, "log-level", "Set internal logging level")
+	fl.BoolVar(&expandVar, "expand-var", false, "Let systemd handle variable expansion ARGS")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -142,6 +144,18 @@ func plz(ctx context.Context, args []string) error {
 		}
 	}
 	progArgs := fl.Args()
+
+	// Systemd has 3 parsing rules for ExecStart:
+	// - ${VAR} : Expands variable
+	// - $$     : Escapes to literal '$'
+	// - $WORD  : Literal '$WORD'
+	// This behaviour is counter intuitive to the CLI use so it is opt-in in plz-run
+	// expandVar is false by default, so by default we escape all $
+	if !expandVar {
+		for i, arg := range progArgs {
+			progArgs[i] = strings.ReplaceAll(arg, "$", "$$")
+		}
+	}
 
 	// Pick a random number as our unique element of the service we're about to start.
 	cookie := rand.Int()
