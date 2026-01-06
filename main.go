@@ -74,6 +74,46 @@ func (b LogLevelBridge) Set(s string) error { return b.Var.UnmarshalText([]byte(
 // Global log level variable.
 var logLevel slog.LevelVar
 
+func createTempScript(progArgs []string) (string, func(), error) {
+	var sb strings.Builder
+	sb.WriteString("#!/bin/bash\nexec")
+
+	for _, arg := range progArgs {
+		sb.WriteString(" '")
+		// Escape single quotes in the argument: ' becomes '\''
+		sb.WriteString(strings.ReplaceAll(arg, "'", "'\\''"))
+		sb.WriteString("'")
+	}
+	sb.WriteString("\n")
+
+	tmpFile, err := os.CreateTemp("", "plz-run-*.sh")
+	if err != nil {
+		return "", nil, fmt.Errorf("cannot create temp script: %w", err)
+	}
+	scriptPath := tmpFile.Name()
+
+	if _, err := tmpFile.WriteString(sb.String()); err != nil {
+		tmpFile.Close()
+		os.Remove(scriptPath)
+		return "", nil, fmt.Errorf("cannot write temp script: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(scriptPath)
+		return "", nil, fmt.Errorf("cannot close temp script: %w", err)
+	}
+
+	if err := os.Chmod(scriptPath, 0777); err != nil {
+		os.Remove(scriptPath)
+		return "", nil, fmt.Errorf("cannot make script executable: %w", err)
+	}
+
+	cleanupFunction := func() {
+		_ = os.Remove(scriptPath)
+	}
+
+	return scriptPath, cleanupFunction, nil
+}
+
 func plz(ctx context.Context, args []string) error {
 	// Constants related to systemd D-Bus interfaces.
 	// Sadly most cannot be strongly typed with go-dbus, as the API relies on untyped strings.
@@ -99,7 +139,6 @@ func plz(ctx context.Context, args []string) error {
 		pamName     string
 		workingDir  string
 		sameDir     bool
-		expandVar   bool
 	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
@@ -108,7 +147,6 @@ func plz(ctx context.Context, args []string) error {
 	fl.StringVar(&workingDir, "C", "", "Ask systemd to use the given WorkingDirectory=")
 	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
 	fl.Var(&LogLevelBridge{Var: &logLevel}, "log-level", "Set internal logging level")
-	fl.BoolVar(&expandVar, "expand-var", false, "Let systemd handle variable expansion ARGS")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -145,17 +183,14 @@ func plz(ctx context.Context, args []string) error {
 	}
 	progArgs := fl.Args()
 
-	// Systemd has 3 parsing rules for ExecStart:
-	// - ${VAR} : Expands variable
-	// - $$     : Escapes to literal '$'
-	// - $WORD  : Literal '$WORD'
-	// This behaviour is counter intuitive to the CLI use so it is opt-in in plz-run
-	// expandVar is false by default, so by default we escape all $
-	if !expandVar {
-		for i, arg := range progArgs {
-			progArgs[i] = strings.ReplaceAll(arg, "$", "$$")
-		}
+	// Create temporary script to work around https://github.com/systemd/systemd/issues/3302
+	scriptPath, cleanupFunction, err := createTempScript(progArgs)
+	if err != nil {
+		return err
 	}
+	defer cleanupFunction()
+
+	slog.Debug("created temp script", slog.String("path", scriptPath))
 
 	// Pick a random number as our unique element of the service we're about to start.
 	cookie := rand.Int()
@@ -216,7 +251,10 @@ func plz(ctx context.Context, args []string) error {
 				Path          string
 				Args          []string
 				IgnoreFailure bool
-			}{{Path: progPath, Args: progArgs}}),
+			}{{
+				Path: scriptPath,
+				Args: []string{scriptPath},
+			}}),
 		},
 	}
 	if user != "" {
