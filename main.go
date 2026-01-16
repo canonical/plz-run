@@ -39,7 +39,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"strconv"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -101,7 +100,6 @@ func plz(ctx context.Context, args []string) error {
 		workingDir            string
 		sameDir               bool
 		expandVar             bool
-		ambientCapabilitiesIn string
 		ambientCapabilities   uint64
 	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
@@ -112,7 +110,7 @@ func plz(ctx context.Context, args []string) error {
 	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
 	fl.Var(&LogLevelBridge{Var: &logLevel}, "log-level", "Set internal logging level")
 	fl.BoolVar(&expandVar, "expand-var", false, "Let systemd handle variable expansion ARGS")
-	fl.StringVar(&ambientCapabilitiesIn, "ambient-capabilities", "", "Ask systemd to use given AmbientCapabilities bitset")
+	fl.Uint64Var(&ambientCapabilities, "ambient-capabilities", 0, "Ask systemd to use given AmbientCapabilities bitset")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -160,16 +158,6 @@ func plz(ctx context.Context, args []string) error {
 	if !expandVar {
 		for i, arg := range progArgs {
 			progArgs[i] = strings.ReplaceAll(arg, "$", "$$")
-		}
-	}
-
-	hasAmbientCapabilities := false
-	if ambientCapabilitiesIn != "" {
-		hasAmbientCapabilities = true
-		var err error
-		ambientCapabilities, err = strconv.ParseUint(ambientCapabilitiesIn, 10, 64)
-		if err != nil {
-			return err
 		}
 	}
 
@@ -250,7 +238,7 @@ func plz(ctx context.Context, args []string) error {
 	if workingDir != "" {
 		props = append(props, Prop{Name: "WorkingDirectory", Value: dbus.MakeVariant(workingDir)})
 	}
-	if hasAmbientCapabilities {
+	if ambientCapabilities != 0 {
 		props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
 	}
 
