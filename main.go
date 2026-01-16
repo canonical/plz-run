@@ -39,6 +39,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"strconv"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -94,12 +95,14 @@ func plz(ctx context.Context, args []string) error {
 	// Parse arguments.
 	fl := flag.NewFlagSet("plz-run", flag.ContinueOnError)
 	var (
-		user, group string
-		env         EnvList
-		pamName     string
-		workingDir  string
-		sameDir     bool
-		expandVar   bool
+		user, group           string
+		env                   EnvList
+		pamName               string
+		workingDir            string
+		sameDir               bool
+		expandVar             bool
+		ambientCapabilitiesIn string
+		ambientCapabilities   uint64
 	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
@@ -109,6 +112,7 @@ func plz(ctx context.Context, args []string) error {
 	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
 	fl.Var(&LogLevelBridge{Var: &logLevel}, "log-level", "Set internal logging level")
 	fl.BoolVar(&expandVar, "expand-var", false, "Let systemd handle variable expansion ARGS")
+	fl.StringVar(&ambientCapabilitiesIn, "ambient-capabilities", "", "Ask systemd to use given AmbientCapabilities bitset")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -136,6 +140,7 @@ func plz(ctx context.Context, args []string) error {
 
 	// Find the program the user wants to run.
 	progPath := fl.Arg(0)
+
 	if !filepath.IsAbs(progPath) {
 		var err error
 		progPath, err = exec.LookPath(progPath)
@@ -143,6 +148,7 @@ func plz(ctx context.Context, args []string) error {
 			return err
 		}
 	}
+
 	progArgs := fl.Args()
 
 	// Systemd has 3 parsing rules for ExecStart:
@@ -154,6 +160,16 @@ func plz(ctx context.Context, args []string) error {
 	if !expandVar {
 		for i, arg := range progArgs {
 			progArgs[i] = strings.ReplaceAll(arg, "$", "$$")
+		}
+	}
+
+	hasAmbientCapabilities := false
+	if ambientCapabilitiesIn != "" {
+		hasAmbientCapabilities = true
+		var err error
+		ambientCapabilities, err = strconv.ParseUint(ambientCapabilitiesIn, 10, 64)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -234,6 +250,10 @@ func plz(ctx context.Context, args []string) error {
 	if workingDir != "" {
 		props = append(props, Prop{Name: "WorkingDirectory", Value: dbus.MakeVariant(workingDir)})
 	}
+	if hasAmbientCapabilities {
+		props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
+	}
+
 	// The slice of auxiliary units is required by the API but unused.
 	var aux []struct {
 		Name       string
