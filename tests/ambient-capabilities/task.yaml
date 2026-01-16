@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Massimiliano Girardi
+summary: capabilities are set in the command context
+execute: |
+  # 2359488 is CAP_SETGID | CAP_SETUID | CAP_SYS_CHROOT | CAP_SYS_ADMIN
+  CAPABILITIES=$(plz-run -ambient-capabilities 2359488 bash -c "getpcaps \$\$")
+  echo "$CAPABILITIES" | MATCH cap_setgid
+  echo "$CAPABILITIES" | MATCH cap_setuid
+  echo "$CAPABILITIES" | MATCH cap_sys_chroot
+  echo "$CAPABILITIES" | MATCH cap_sys_admin
