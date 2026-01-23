@@ -38,9 +38,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
-	"strconv"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -274,7 +274,7 @@ func plz(ctx context.Context, args []string) error {
 		// on 226 AmbientCapabilities are supported but can't be set from the dbus API until after 229
 		if systemdVersion > 229 {
 			props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
-		}else{
+		} else {
 			return fmt.Errorf("Unable to set AmbientCapabilities on this version of systemd (dbus API not supported). Detected version:", systemdVersion)
 		}
 	}
