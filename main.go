@@ -91,9 +91,7 @@ func (b LogLevelBridge) Set(s string) error { return b.Var.UnmarshalText([]byte(
 
 func parseSystemdVersion(version string) (uint64, error) {
 	lastDigit := strings.IndexFunc(version, func(c rune) bool { return !unicode.IsDigit(c) })
-	if lastDigit == 0 {
-		return 0, fmt.Errorf("cannot parse systemd version: %q", version)
-	} else if lastDigit == -1 {
+	if lastDigit == -1 {
 		lastDigit = len(version)
 	}
 	major := version[:lastDigit]
@@ -274,7 +272,7 @@ func plz(ctx context.Context, args []string) error {
 	}
 	if ambientCapabilities != 0 {
 		// on 226 AmbientCapabilities are supported but can't be set from the dbus API until after 229
-		if systemdVersion <= 229 {
+		if systemdVersion < 230 {
 			return fmt.Errorf("Unable to set AmbientCapabilities on this version of systemd (dbus API not supported). Detected version: %q", systemdVersion)
 		}
 		props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
