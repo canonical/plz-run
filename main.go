@@ -273,7 +273,7 @@ func plz(ctx context.Context, args []string) error {
 	if ambientCapabilities != 0 {
 		// on 226 AmbientCapabilities are supported but can't be set from the dbus API until after 229
 		if systemdVersion < 230 {
-			return fmt.Errorf("Unable to set AmbientCapabilities on this version of systemd (dbus API not supported). Detected version: %q", systemdVersion)
+			return fmt.Errorf("cannot set AmbientCapabilities on this version of systemd (dbus API not supported). Detected version: %q", systemdVersion)
 		}
 		props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
 	}
