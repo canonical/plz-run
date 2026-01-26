@@ -89,6 +89,20 @@ func (b LogLevelBridge) String() string {
 
 func (b LogLevelBridge) Set(s string) error { return b.Var.UnmarshalText([]byte(s)) }
 
+func parseSystemdVersion(version string) (uint64, error) {
+	lastDigit := strings.IndexFunc(version, func(c rune) bool { return !unicode.IsDigit(c) })
+	if lastDigit == 0 {
+		return 0, fmt.Errorf("cannot parse systemd version: %q", version)
+	} else if lastDigit == -1 {
+		lastDigit = len(version)
+	}
+	major := version[:lastDigit]
+	if major == "" {
+		return 0, fmt.Errorf("cannot parse systemd version: %q", version)
+	}
+	return strconv.ParseUint(major, 10, 64)
+}
+
 func getSystemdMajorVersion(ctx context.Context, conn *dbus.Conn) (uint64, error) {
 	// Returns the version of systemd or, on failure, 0 for maximum compatibility mode
 	obj := conn.Object(fdoSystemd1BusName, fdoSystemd1ObjectPath)
@@ -98,19 +112,7 @@ func getSystemdMajorVersion(ctx context.Context, conn *dbus.Conn) (uint64, error
 	if err != nil {
 		return 0, fmt.Errorf("cannot get systemd version: %w", err)
 	}
-	var lastDigit int
-	for i, r := range version {
-		lastDigit = i
-		if !unicode.IsDigit(r) {
-			lastDigit -= 1
-			break
-		}
-	}
-	major := version[:lastDigit+1]
-	if major == "" {
-		return 0, errors.New("unable to parse systemd version, missing '.': Version string: " + version)
-	}
-	return strconv.ParseUint(major, 10, 64)
+	return parseSystemdVersion(version)
 }
 
 // Global log level variable.
@@ -272,11 +274,10 @@ func plz(ctx context.Context, args []string) error {
 	}
 	if ambientCapabilities != 0 {
 		// on 226 AmbientCapabilities are supported but can't be set from the dbus API until after 229
-		if systemdVersion > 229 {
-			props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
-		} else {
-			return fmt.Errorf("Unable to set AmbientCapabilities on this version of systemd (dbus API not supported). Detected version:", systemdVersion)
+		if systemdVersion <= 229 {
+			return fmt.Errorf("Unable to set AmbientCapabilities on this version of systemd (dbus API not supported). Detected version: %q", systemdVersion)
 		}
+		props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
 	}
 
 	// The slice of auxiliary units is required by the API but unused.
