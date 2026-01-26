@@ -38,7 +38,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -57,6 +59,22 @@ func (e *EnvList) Set(value string) error {
 	return nil
 }
 
+// Constants related to systemd D-Bus interfaces.
+// Sadly most cannot be strongly typed with go-dbus, as the API relies on untyped strings.
+const (
+	dbusPropsIface                                      = "org.freedesktop.DBus.Properties"
+	dbusPropsPropertiesChangedMember                    = "PropertiesChanged"
+	dbusPropsPropertiesChangedSignal                    = dbusPropsIface + "." + dbusPropsPropertiesChangedMember
+	fdoSystemd1BusName                                  = "org.freedesktop.systemd1"
+	fdoSystemd1ObjectPath               dbus.ObjectPath = "/org/freedesktop/systemd1"
+	fdoSystemd1ManagerIface                             = fdoSystemd1BusName + ".Manager"
+	fdoSystemd1ServiceIface                             = fdoSystemd1BusName + ".Service"
+	fdoSystemd1StartTransientUnitMethod                 = fdoSystemd1ManagerIface + ".StartTransientUnit"
+	fdoSystemd1ResetFailedUnitMethod                    = fdoSystemd1ManagerIface + ".ResetFailedUnit"
+	fdoSystemd1ManagerJobRemovedMember                  = "JobRemoved"
+	fdoSystemd1ManagerJobRemovedSignal                  = fdoSystemd1ManagerIface + "." + fdoSystemd1ManagerJobRemovedMember
+)
+
 // LogLevelBridge bridges flag.Var with slog.LevelVar
 //
 // This masks over the incompatible signature of Set between the interface and the type.
@@ -71,35 +89,45 @@ func (b LogLevelBridge) String() string {
 
 func (b LogLevelBridge) Set(s string) error { return b.Var.UnmarshalText([]byte(s)) }
 
+func parseSystemdVersion(version string) (uint64, error) {
+	lastDigit := strings.IndexFunc(version, func(c rune) bool { return !unicode.IsDigit(c) })
+	if lastDigit == -1 {
+		lastDigit = len(version)
+	}
+	major := version[:lastDigit]
+	if major == "" {
+		return 0, fmt.Errorf("cannot parse systemd version: %q", version)
+	}
+	return strconv.ParseUint(major, 10, 64)
+}
+
+func getSystemdMajorVersion(ctx context.Context, conn *dbus.Conn) (uint64, error) {
+	// Returns the version of systemd or, on failure, 0 for maximum compatibility mode
+	obj := conn.Object(fdoSystemd1BusName, fdoSystemd1ObjectPath)
+	var version string
+	err := obj.CallWithContext(ctx, dbusPropsIface+".Get", 0,
+		fdoSystemd1ManagerIface, "Version").Store(&version)
+	if err != nil {
+		return 0, fmt.Errorf("cannot get systemd version: %w", err)
+	}
+	return parseSystemdVersion(version)
+}
+
 // Global log level variable.
 var logLevel slog.LevelVar
 
 func plz(ctx context.Context, args []string) error {
-	// Constants related to systemd D-Bus interfaces.
-	// Sadly most cannot be strongly typed with go-dbus, as the API relies on untyped strings.
-	const (
-		dbusPropsIface                                      = "org.freedesktop.DBus.Properties"
-		dbusPropsPropertiesChangedMember                    = "PropertiesChanged"
-		dbusPropsPropertiesChangedSignal                    = dbusPropsIface + "." + dbusPropsPropertiesChangedMember
-		fdoSystemd1BusName                                  = "org.freedesktop.systemd1"
-		fdoSystemd1ObjectPath               dbus.ObjectPath = "/org/freedesktop/systemd1"
-		fdoSystemd1ManagerIface                             = fdoSystemd1BusName + ".Manager"
-		fdoSystemd1ServiceIface                             = fdoSystemd1BusName + ".Service"
-		fdoSystemd1StartTransientUnitMethod                 = fdoSystemd1ManagerIface + ".StartTransientUnit"
-		fdoSystemd1ResetFailedUnitMethod                    = fdoSystemd1ManagerIface + ".ResetFailedUnit"
-		fdoSystemd1ManagerJobRemovedMember                  = "JobRemoved"
-		fdoSystemd1ManagerJobRemovedSignal                  = fdoSystemd1ManagerIface + "." + fdoSystemd1ManagerJobRemovedMember
-	)
 
 	// Parse arguments.
 	fl := flag.NewFlagSet("plz-run", flag.ContinueOnError)
 	var (
-		user, group string
-		env         EnvList
-		pamName     string
-		workingDir  string
-		sameDir     bool
-		expandVar   bool
+		user, group         string
+		env                 EnvList
+		pamName             string
+		workingDir          string
+		sameDir             bool
+		expandVar           bool
+		ambientCapabilities uint64
 	)
 	fl.StringVar(&user, "u", "", "Ask systemd to use given User=")
 	fl.StringVar(&group, "g", "", "Ask systemd to use given Group=")
@@ -109,6 +137,7 @@ func plz(ctx context.Context, args []string) error {
 	fl.BoolVar(&sameDir, "same-dir", false, "Same as -C=$CURDIR")
 	fl.Var(&LogLevelBridge{Var: &logLevel}, "log-level", "Set internal logging level")
 	fl.BoolVar(&expandVar, "expand-var", false, "Let systemd handle variable expansion ARGS")
+	fl.Uint64Var(&ambientCapabilities, "ambient-capabilities", 0, "Ask systemd to use given AmbientCapabilities bitset")
 	fl.Usage = func() {
 		fmt.Fprintf(fl.Output(), "Usage: %s [OPTIONS] PROG [ARGS]\n", fl.Name())
 		fl.PrintDefaults()
@@ -136,6 +165,7 @@ func plz(ctx context.Context, args []string) error {
 
 	// Find the program the user wants to run.
 	progPath := fl.Arg(0)
+
 	if !filepath.IsAbs(progPath) {
 		var err error
 		progPath, err = exec.LookPath(progPath)
@@ -143,6 +173,7 @@ func plz(ctx context.Context, args []string) error {
 			return err
 		}
 	}
+
 	progArgs := fl.Args()
 
 	// Systemd has 3 parsing rules for ExecStart:
@@ -234,6 +265,19 @@ func plz(ctx context.Context, args []string) error {
 	if workingDir != "" {
 		props = append(props, Prop{Name: "WorkingDirectory", Value: dbus.MakeVariant(workingDir)})
 	}
+	var systemdVersion uint64
+	systemdVersion, err = getSystemdMajorVersion(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if ambientCapabilities != 0 {
+		// on 226 AmbientCapabilities are supported but can't be set from the dbus API until after 229
+		if systemdVersion < 230 {
+			return fmt.Errorf("cannot set AmbientCapabilities on this version of systemd (dbus API not supported). Detected version: %q", systemdVersion)
+		}
+		props = append(props, Prop{Name: "AmbientCapabilities", Value: dbus.MakeVariant(ambientCapabilities)})
+	}
+
 	// The slice of auxiliary units is required by the API but unused.
 	var aux []struct {
 		Name       string

@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Massimiliano Girardi
+summary: capabilities are set in the command context
+execute: |
+  # 2359488 is CAP_SETGID | CAP_SETUID | CAP_SYS_CHROOT | CAP_SYS_ADMIN
+  # Not using getcaps as core18 doesn't have it
+  # note the -u ubuntu! else CapAmb is 0 (Caps aren't enforced for root)
+  . /etc/os-release
+  # core16 and 16.04 don't support the ambientCapabilities API
+  if awk "BEGIN {exit !($VERSION_ID <= 16.04)}"; then
+    ERR=$(plz-run -u ubuntu -ambient-capabilities 2359488 bash -c "cat /proc/self/status | grep CapAmb | cut -f2" 2>&1)
+    echo $ERR | MATCH "Unable to set AmbientCapabilities on this version of systemd"
+    exit 0
+  fi
+  CAP_BITSET_HEX=`plz-run -u ubuntu -ambient-capabilities 2359488 bash -c "cat /proc/self/status | grep CapAmb | cut -f2"`
+  CAP_BITSET_DEC=$(echo $((16#$CAP_BITSET_HEX)))
+  echo $CAP_BITSET_DEC | MATCH 2359488
+
+  # check that plz-run actually doesn't set any ambient cap by default
+  CAP_BITSET_HEX=`plz-run -u ubuntu bash -c "cat /proc/self/status | grep CapAmb | cut -f2"`
+  CAP_BITSET_DEC=$(echo $((16#$CAP_BITSET_HEX)))
+  echo $CAP_BITSET_DEC | MATCH 0
