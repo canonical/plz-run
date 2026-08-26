@@ -131,6 +131,8 @@ jobs:
 
     - name: Upload package to Launchpad PPA
       run: |
+        # buildpackage produces in parent directory
+        cd ..
         PACKAGE_CHANGES=$(find . -name "*source.changes" | head -n 1)
         cat $PACKAGE_CHANGES
         if [ -z "$PACKAGE_CHANGES" ]; then
