@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+export CGO_ENABLED := 0
+export GOFLAGS := -mod=vendor -trimpath
+export GO111MODULE := on
+
+GO := $(if $(wildcard /usr/lib/go-1.22/bin/go),/usr/lib/go-1.22/bin/go,go)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	dh_auto_build -- GO=$(GO)
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	$(GO) test ./...
+endif
+
+override_dh_auto_install:
+	dh_auto_install -- prefix=/usr GO=$(GO)
+
+# dwz cannot process Go's compressed DWARF sections.
+override_dh_dwz:

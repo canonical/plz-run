@@ -1,0 +1,45 @@
+name: "Publish tagged plz-run release"
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: read
+
+jobs:
+  tag-metadata:
+    name: Resolve tagged commit
+    runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.metadata.outputs.commit_sha }}
+      commit_short_sha: ${{ steps.metadata.outputs.commit_short_sha }}
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve tag metadata
+        id: metadata
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -eu
+          COMMIT_SHA=$(git rev-parse 'HEAD^{commit}')
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+          echo "commit_short_sha=$(git rev-parse --short "$COMMIT_SHA")" >> "$GITHUB_OUTPUT"
+          echo "version=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish tagged release
+    needs: tag-metadata
+    uses: ./.github/workflows/plz_run_ppa.yaml
+    with:
+      version: ${{ needs.tag-metadata.outputs.version }}
+      commit_sha: ${{ needs.tag-metadata.outputs.commit_sha }}
+      commit_short_sha: ${{ needs.tag-metadata.outputs.commit_short_sha }}
+    secrets: inherit

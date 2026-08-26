@@ -1,0 +1,142 @@
+name: "Build & Publish plz-run Edge PPA"
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semantic version'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Commit SHA to build from'
+        required: true
+        type: string
+      commit_short_sha:
+        description: 'Commit short SHA for run name visualization'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        description: 'Debian package version'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Commit SHA to build from'
+        required: true
+        type: string
+      commit_short_sha:
+        description: 'Commit short SHA for run name visualization'
+        required: true
+        type: string
+    secrets:
+      LP_GPG_PRIVATE_KEY:
+        required: true
+      LP_GPG_PUBLIC_KEY:
+        required: true
+      LAUNCHPAD_SSH_KEY:
+        required: true
+
+run-name: "Build version: ${{ inputs.version }} (${{ inputs.commit_short_sha }})"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and publish PPA
+    strategy:
+      matrix:
+        distro: [focal, jammy, noble, resolute, stonking]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        ref: ${{ inputs.commit_sha }}
+        fetch-depth: 0
+        persist-credentials: false
+
+    # Prevent lxd-agent from getting restarted on apt upgrades.
+    # https://warthogs.atlassian.net/browse/ISD-2139
+    - name: Disable lxd-agent restart
+      run: |
+        mkdir -p /etc/needrestart/conf.d
+        echo '$nrconf{override_rc}{qr(^lxd-agent.service$)} = 0;' | sudo tee /etc/needrestart/conf.d/lxdagent.conf
+
+    - name: Adopt gpg key
+      env:
+        LP_GPG_PRIVATE_KEY: ${{ secrets.LP_GPG_PRIVATE_KEY }}
+        LP_GPG_PUBLIC_KEY: ${{ secrets.LP_GPG_PUBLIC_KEY }}
+      run: |
+        echo "$LP_GPG_PRIVATE_KEY" >> private
+        echo "$LP_GPG_PUBLIC_KEY" >> public
+        gpg --import private public
+        rm private public
+
+    - name: Add Checkbox PPA (with retry)
+      uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea
+      with:
+        attempt_limit: 3
+        command: sudo add-apt-repository ppa:checkbox-dev/edge
+
+    - name: Download dependencies
+      run: |
+        set -xeu
+        sudo apt update
+        sudo DEBIAN_FRONTEND=noninteractive apt install -y \
+          debhelper \
+          devscripts \
+          sbuild \
+          schroot \
+          debootstrap \
+          jq \
+          mmdebstrap \
+          uidmap \
+          sbuild-debian-developer-setup \
+          pkg-config
+        sudo DEBIAN_FRONTEND=noninteractive apt-get -qq -y build-dep .
+
+    - name: Build Debian package on host system and run checks
+      env:
+        DEBFULLNAME: "Devices Certification Bot"
+        DEBMAIL: "ce-certification-qa@lists.canonical.com"
+        INPUT_DISTRO: ${{ matrix.distro }}
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        export INPUT_TODAY=$(date --rfc-2822)
+        envsubst '$INPUT_VERSION $INPUT_TODAY $INPUT_DISTRO' < debian/changelog.in  > debian/changelog
+        rm debian/changelog.in
+        cat debian/changelog
+
+        KEY_ID=$(gpg --list-secret-keys --with-colons --fingerprint | awk -F: '/^fpr:/ {print $10; exit}')
+        dpkg-buildpackage -S -k"$KEY_ID"
+
+    - name: Setup SSH for uploading package to Launchpad PPA
+      env:
+        LAUNCHPAD_SSH_KEY: ${{ secrets.LAUNCHPAD_SSH_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$LAUNCHPAD_SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+
+        cat <<'EOF' >> ~/.ssh/config
+        Host ppa.launchpad.net
+          IdentityFile ~/.ssh/id_rsa
+          StrictHostKeyChecking no
+        EOF
+
+    - name: Upload package to Launchpad PPA
+      run: |
+        # buildpackage produces in parent directory
+        cd ..
+        PACKAGE_CHANGES=$(find . -name "*source.changes" | head -n 1)
+        cat $PACKAGE_CHANGES
+        if [ -z "$PACKAGE_CHANGES" ]; then
+          echo "No .changes file found"
+          exit 1
+        fi
+        dput --debug ppa:checkbox-dev/edge $PACKAGE_CHANGES
