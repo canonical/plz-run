@@ -406,12 +406,14 @@ func plz(ctx context.Context, args []string) error {
 		return fmt.Errorf("killed by signal %d", execMainStatus)
 	case "core-dump":
 		return errors.New("program dumped core")
+	case "oom-kill":
+		return errors.New("killed by OOMKiller")
 	default:
 		return fmt.Errorf("unhandled systemd job result value: %v", result)
 	}
 }
 
-func main() {
+func plzRun() int {
 	logLevel.Set(slog.LevelWarn)
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel})))
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -422,11 +424,17 @@ func main() {
 	err := plz(ctx, os.Args[1:])
 	if err != nil {
 		if err, ok := err.(SilentError); ok {
-			os.Exit(int(err))
+			return int(err)
 		}
 
-		fmt.Fprintf(os.Stderr, "%s error: %s", filepath.Base(os.Args[0]), err.Error())
+		fmt.Fprintf(os.Stderr, "%s error: %s\n", filepath.Base(os.Args[0]), err.Error())
+		return -1
 	}
+	return 0
+}
+
+func main() {
+	os.Exit(plzRun())
 }
 
 // SilentError is an error type that produces a given error code but no error message.
