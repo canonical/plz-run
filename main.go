@@ -413,7 +413,7 @@ func plz(ctx context.Context, args []string) error {
 	}
 }
 
-func plz_run() int {
+func plzRun() int {
 	logLevel.Set(slog.LevelWarn)
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: &logLevel})))
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -427,14 +427,14 @@ func plz_run() int {
 			return int(err)
 		}
 
-		fmt.Fprintf(os.Stderr, "%s error: %s", filepath.Base(os.Args[0]), err.Error())
+		fmt.Fprintf(os.Stderr, "%s error: %s\n", filepath.Base(os.Args[0]), err.Error())
 		return -1
 	}
 	return 0
 }
 
 func main() {
-	os.Exit(plz_run())
+	os.Exit(plzRun())
 }
 
 // SilentError is an error type that produces a given error code but no error message.
