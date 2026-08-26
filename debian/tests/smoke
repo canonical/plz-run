@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+
+plz-run -h 2>&1 | grep -q '^Usage: plz-run '

@@ -1,0 +1,5 @@
+plz-run (0.4) UNRELEASED; urgency=medium
+
+  * Initial Debian packaging.
+
+ -- Canonical Hardware Certification Team <ce-certification-qa@lists.canonical.com>  Wed, 26 Aug 2026 00:00:00 +0000

@@ -1,0 +1,21 @@
+Source: plz-run
+Section: utils
+Maintainer: Canonical Hardware Certification Team <ce-certification-qa@lists.canonical.com>
+Build-Depends:
+ debhelper-compat (= 12),
+ golang-go (>= 2:1.22~) | golang-1.22-go,
+Standards-Version: 4.7.3
+Homepage: https://github.com/canonical/plz-run
+Vcs-Browser: https://github.com/canonical/plz-run
+Vcs-Git: https://github.com/canonical/plz-run.git
+
+Package: plz-run
+Architecture: any
+Depends: ${misc:Depends}
+Description: run programs across a sandbox boundary
+ plz-run asks the systemd system manager to start a program in a new execution
+ environment. With suitable D-Bus and systemd permissions, this lets a
+ confined application run a payload outside its own sandbox.
+ .
+ Standard input, output, and error are connected to the calling process, and
+ the payload's exit status is relayed to the caller.

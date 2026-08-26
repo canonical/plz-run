@@ -1,0 +1,2 @@
+# plz-run deliberately disables cgo to produce a portable Go executable.
+plz-run: statically-linked-binary [usr/bin/plz-run]

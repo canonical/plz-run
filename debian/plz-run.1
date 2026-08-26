@@ -1,0 +1,54 @@
+.TH PLZ-RUN 1 "August 2026" "plz-run" "User Commands"
+.SH NAME
+plz-run \- run a program through the systemd system manager
+.SH SYNOPSIS
+.B plz-run
+.RI [ options ]
+.I program
+.RI [ arguments ...]
+.SH DESCRIPTION
+.B plz-run
+asks systemd to start a transient service for the requested program. Standard
+input, standard output, and standard error are passed to the service, and the
+program's exit status is returned to the caller.
+.PP
+The caller needs permission to access the system bus and to ask systemd to
+start the transient service. This can be used to run a program across a
+sandbox boundary when the confinement policy grants those permissions.
+.SH OPTIONS
+.TP
+.BI \-u " user"
+Run the program as the specified user.
+.TP
+.BI \-g " group"
+Run the program as the specified group.
+.TP
+.BI \-E " name=value"
+Add an environment variable. This option may be specified more than once.
+.TP
+.BI \-pam " name"
+Set the systemd PAMName property.
+.TP
+.BI \-C " directory"
+Set the working directory.
+.TP
+.B \-same-dir
+Use the caller's current working directory. This cannot be combined with
+.BR \-C .
+.TP
+.BI \-log-level " level"
+Set the internal logging level.
+.TP
+.B \-expand-var
+Allow systemd to expand variables in program arguments. By default, dollar
+signs are escaped before the request is sent to systemd.
+.TP
+.BI \-ambient-capabilities " bitset"
+Set the systemd AmbientCapabilities property to the given decimal bitset.
+.SH EXIT STATUS
+The payload's exit status is returned when it exits normally. An error is
+reported if the transient service cannot be started or its result cannot be
+interpreted.
+.SH SEE ALSO
+.BR systemd-run (1),
+.BR systemd.service (5)

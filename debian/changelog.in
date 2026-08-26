@@ -1,0 +1,5 @@
+plz-run (${INPUT_VERSION}~${INPUT_DISTRO}1) ${INPUT_DISTRO}; urgency=medium
+
+  * Automated edge build of plz-run ${INPUT_VERSION}.
+
+ -- Devices Certification Bot <ce-certification-qa@lists.canonical.com>  ${INPUT_TODAY}
