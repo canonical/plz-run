@@ -3,6 +3,8 @@
 export CGO_ENABLED := 0
 export GOFLAGS := -mod=vendor -trimpath
 export GO111MODULE := on
+export GOCACHE := $(CURDIR)/.cache/go-build
+export GOPATH := $(CURDIR)/.cache/gopath
 
 GO := $(if $(wildcard /usr/lib/go-1.22/bin/go),/usr/lib/go-1.22/bin/go,go)
 

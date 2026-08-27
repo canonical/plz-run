@@ -50,7 +50,7 @@ jobs:
     name: Build and publish PPA
     strategy:
       matrix:
-        distro: [focal, jammy, noble, resolute, stonking]
+        distro: [jammy, noble, resolute, stonking]
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repository
