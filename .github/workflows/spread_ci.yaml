@@ -1,0 +1,33 @@
+name: spread
+on:
+    push:
+        branches: ["main"]
+    pull_request:
+jobs:
+  testing:
+    strategy:
+      matrix:
+        system:
+          - ubuntu-core-16
+          - ubuntu-core-18
+          - ubuntu-core-20
+          - ubuntu-core-22
+          - ubuntu-core-24
+          - ubuntu-cloud-16.04
+          - ubuntu-cloud-18.04
+          - ubuntu-cloud-20.04
+          - ubuntu-cloud-22.04
+          - ubuntu-cloud-24.04
+    runs-on: ubuntu-latest
+    name: Testing ${{ matrix.system }}
+    steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+        - name: Run integration tests
+          uses: zyga/image-garden-action@v0.3
+          with:
+            snapd-channel: latest/stable
+            image-garden-channel: latest/edge
+            garden-system: ${{ matrix.system }}
