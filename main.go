@@ -270,6 +270,12 @@ func plz(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	// systemd 243+ stops the whole unit when the OOM killer kills any
+	// process in its cgroup.
+	// instead just let the unit's program decide how to handle dead child processes
+	if systemdVersion >= 243 {
+		props = append(props, Prop{Name: "OOMPolicy", Value: dbus.MakeVariant("continue")})
+	}
 	if ambientCapabilities != 0 {
 		// on 226 AmbientCapabilities are supported but can't be set from the dbus API until after 229
 		if systemdVersion < 230 {
